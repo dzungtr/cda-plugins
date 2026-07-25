@@ -1,6 +1,6 @@
 # harness5 — Claude Code & Codex Plugin
 
-harness5 ships the cc-harness workflow skills and a local infrastructure stack
+harness5 ships the cda-plugins workflow skills and a local infrastructure stack
 (SigNoz observability, Graphiti memory) as a self-contained plugin under
 `plugins/harness5/`. It installs identically into Claude Code and Codex from the
 same git repository; the same `skills/` and `infrastructure/` tree ships to both
@@ -26,14 +26,14 @@ and waits for the SigNoz healthcheck. Once the stack is up:
 ### Claude Code
 
 ```sh
-claude plugin marketplace add dzungtr/cc-harness
+claude plugin marketplace add dzungtr/cda-plugins
 claude plugin install harness5
 ```
 
 ### Codex
 
 ```sh
-codex plugin marketplace add dzungtr/cc-harness
+codex plugin marketplace add dzungtr/cda-plugins
 codex plugin install harness5
 ```
 

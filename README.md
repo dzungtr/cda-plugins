@@ -1,4 +1,4 @@
-# cc-harness plugins
+# cda-plugins repo
 
 This repository is a multi-plugin distribution repo for Claude Code and Codex.
 It ships self-contained plugins under `plugins/`, each installable from the
@@ -16,14 +16,14 @@ same git repository via the harness's native plugin marketplace.
 ### Claude Code (harness5 only)
 
 ```sh
-claude plugin marketplace add dzungtr/cc-harness
+claude plugin marketplace add dzungtr/cda-plugins
 claude plugin install harness5
 ```
 
 ### Codex (both plugins)
 
 ```sh
-codex plugin marketplace add dzungtr/cc-harness
+codex plugin marketplace add dzungtr/cda-plugins
 codex plugin install harness5      # skills + infra stack
 codex plugin install auto-review   # permission auto-review hook
 ```

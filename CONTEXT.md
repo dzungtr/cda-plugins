@@ -1,4 +1,4 @@
-# CONTEXT — cc-harness plugins
+# CONTEXT — cda-plugins repo
 
 This repository is a multi-plugin distribution repo for Claude Code and Codex.
 Each plugin lives self-contained under `plugins/<name>/`. The glossary below
