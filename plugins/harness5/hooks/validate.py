@@ -6,7 +6,7 @@ acceptance criteria require, plus plugin-specific checks that the generic
 validator doesn't cover:
 
   1. manifest-version: both `.codex-plugin/plugin.json` and
-     `.claude-plugin/plugin.json` declare version "0.2.1".
+     `.claude-plugin/plugin.json` declare version "0.2.2".
   2. manifest-hooks-field: `.codex-plugin/plugin.json` references
      `./codex/hooks.json` and `.claude-plugin/plugin.json` references
      `./claude/hooks.json`.
@@ -35,7 +35,7 @@ import sys
 from pathlib import Path
 from typing import Callable, List, Tuple
 
-EXPECTED_VERSION = "0.2.1"
+EXPECTED_VERSION = "0.2.2"
 CLAUDE_HOOK_PATH = "./claude/hooks.json"
 
 

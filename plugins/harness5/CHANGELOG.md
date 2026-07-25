@@ -2,6 +2,31 @@
 
 All notable changes to the `harness5` plugin.
 
+## [0.2.2] - 2026-07-25
+
+Patch release. Adds the shared SELinux label (`z`) to the `graphiti-mcp`
+config bind mount in `infrastructure/docker-compose.yml` so the MCP
+server starts cleanly on Fedora/RHEL hosts with SELinux enforcing.
+
+### Fixed
+
+- **graphiti-mcp crash on SELinux-enforcing hosts** — the host bind
+  mount of `config.yaml` into the `zepai/knowledge-graph-mcp` container
+  was declared `:ro` only. The host file lives under `/home/...` and
+  carries the `user_home_t` SELinux label, so the container process was
+  denied `stat()` and the MCP server crashed with
+  `PermissionError: [Errno 13] Permission denied:
+  '/app/mcp/config/config.yaml'`. Adding the `z` relabel brings the
+  mount into line with every other bind mount in the file (memgraph,
+  clickhouse, otel collector) and unblocks the container without
+  changing read-only semantics. SELinux-disabled hosts are unaffected
+  (`z` is a no-op there).
+
+### Notes
+
+- Same-day patch release against `0.2.1`. No manifest schema, skill, or
+  hook behaviour change.
+
 ## [0.2.1] - 2026-07-25
 
 Adds a `SessionStart` hook that injects the bundled `references/harness5.md`
