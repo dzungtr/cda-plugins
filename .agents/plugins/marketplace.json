@@ -1,14 +1,14 @@
 {
-  "name": "cc-harness",
+  "name": "cda-plugins",
   "interface": {
-    "displayName": "cc-harness"
+    "displayName": "cda-plugins"
   },
   "plugins": [
     {
       "name": "harness5",
       "source": {
         "source": "local",
-        "path": "plugins/harness5"
+        "path": "./plugins/harness5"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -20,7 +20,7 @@
       "name": "auto-review",
       "source": {
         "source": "local",
-        "path": "plugins/auto-review"
+        "path": "./plugins/auto-review"
       },
       "policy": {
         "installation": "AVAILABLE",
