@@ -73,25 +73,23 @@ These are denied instantly, before the LLM agent runs. The bucket is pure regex 
 
 ## LLM agent loop
 
-**Protocol** — calls an OpenAI-compatible Chat Completions endpoint (`/chat/completions`) with `response_format: {"type": "json_object"}` for reliable structured output. The endpoint is the one configured by `AUTO_REVIEW_BASE_URL` (see [Configuration](#configuration)).
+**Protocol** — calls an OpenAI-compatible Chat Completions endpoint (`/chat/completions`) using the native **tool-call** protocol. The hook defines three tools (`allow`, `deny`, `probe`) and sends the request with `tool_choice: "required"` so the model must pick exactly one per turn. The endpoint is the one configured by `AUTO_REVIEW_BASE_URL` (see [Configuration](#configuration)).
 
-**Action protocol** — the model responds with one of three JSON shapes:
+**Why tool calls instead of `response_format: json_object`?** Tool-call capable providers — including any OpenAI-compatible endpoint that exposes a `tool_calls` field — return their decision through `choices[0].message.tool_calls[*].function`, and may emit interleaved reasoning (`<think>...</think>` text in `message.content`, plus `reasoning_details`). Parsing `message.content` as JSON breaks on those responses with `JSONDecodeError`. Tool calls keep the verdict in a structured envelope and let the rest of the assistant message round-trip faithfully into history.
 
-```json
-{"action": "allow"}
-```
+**Tool protocol** — the hook exposes a single `review` tool whose `action` enum drives the decision. We deliberately do NOT split this into separate `allow` / `deny` / `probe` tools: many tool-call capable models struggle to pick the right tool when several similar-looking options live in the same context, so collapsing them into one tool with an enum is a more reliable decision shape.
 
-```json
-{"action": "deny",  "reason": "<why this is unsafe>"}
-```
+| Argument  | Required when        | Type   | Description                                                           |
+|-----------|----------------------|--------|-----------------------------------------------------------------------|
+| `action`  | always               | enum   | One of `allow`, `deny`, `probe`.                                      |
+| `reason`  | `action="deny"`      | string | Why this action is appropriate. Recommended for `allow` and `probe`.  |
+| `command` | `action="probe"`     | string | Read-only shell command to run before deciding.                       |
 
-```json
-{"action": "probe", "command": "<read-only shell command>"}
-```
+**Bounded execution** — `MAX_TURNS = 8`. The agent exits immediately on `allow` or `deny`. On `probe` it executes the command, appends the result to the conversation, and continues. If the model returns a missing or unknown `action`, or `action="probe"` with no `command`, the loop feeds the error back to the model and continues — it does not silently auto-approve or auto-deny.
 
-**Bounded execution** — `MAX_TURNS = 8`. The agent exits immediately on `allow` or `deny`. On `probe` it executes the command, appends the result to the conversation, and continues. If the model returns an unknown action or a `probe` with no `command` field, the loop feeds the error back to the model and continues — it does not silently auto-approve or auto-deny.
+**Per-request timeout** — `LLM_REQUEST_TIMEOUT_SECONDS = 10`. Each LLM call has its own 10-second deadline so the model has room to think while still fitting inside the wall-clock budget.
 
-**Wall-clock budget** — `WALL_CLOCK_BUDGET_SECONDS = 30`. The loop checks elapsed time before each LLM call. If the budget is exhausted (or any single LLM call errors out), it returns `decline` so the user gets the normal approval prompt.
+**Wall-clock budget** — `WALL_CLOCK_BUDGET_SECONDS = 30`. The loop checks elapsed time before each LLM call. If the budget is exhausted, the network errors out, the response has no `tool_calls`, or `tool_call.arguments` is malformed JSON, the loop returns `decline` so the user gets the normal approval prompt. Logging failure is non-fatal.
 
 **Environment snapshot** — the first message to the model includes a redacted environment snapshot (keys matching `KEY|SECRET|TOKEN|PASSWORD|PASSPHRASE|CREDENTIAL|PRIVATE` are replaced with `<redacted>`), plus the repo root, current branch, `git status --porcelain`, and the last five `git log --oneline` lines.
 
@@ -123,14 +121,14 @@ Three environment variables control the LLM agent. The deny-bucket stage runs ev
 |-------------------------|----------|----------------------------------|--------------------------------------------------|
 | `AUTO_REVIEW_BASE_URL`  | yes      | `https://openrouter.ai/api/v1`   | OpenAI-compatible base URL (no trailing slash).  |
 | `AUTO_REVIEW_API_KEY`   | yes      | `sk-or-v1-…`                     | Bearer token for the endpoint.                   |
-| `AUTO_REVIEW_MODEL`     | yes      | `minimax/minimax-m3`             | Exact model id the endpoint exposes.             |
+| `AUTO_REVIEW_MODEL`     | yes      | `<your-model-id>`                | Exact model id the endpoint exposes. Must support OpenAI-style `tool_calls`. |
 
 **OpenRouter (recommended for hosted):**
 
 ```bash
 export AUTO_REVIEW_BASE_URL="https://openrouter.ai/api/v1"
 export AUTO_REVIEW_API_KEY="sk-or-v1-…"
-export AUTO_REVIEW_MODEL="minimax/minimax-m3"
+export AUTO_REVIEW_MODEL="<your-model-id>"   # any tool-capable model on OpenRouter
 ```
 
 **Local Ollama (no API key, local model):**
@@ -258,7 +256,8 @@ Two validators can be run against the plugin tree:
 | Codex shows the normal approval prompt for every command         | The hook isn't trusted yet — `/hooks` step was skipped                | Run `/hooks` in the Codex CLI and trust the `auto-review` `PermissionRequest` entry.                                               |
 | Every command declines, log shows `missing env vars`             | `AUTO_REVIEW_BASE_URL` / `AUTO_REVIEW_API_KEY` / `AUTO_REVIEW_MODEL` not set in Codex's env | Export the three vars in the environment Codex inherits (shell profile, launcher, `~/.codex/.env`).                                  |
 | Every command declines, log shows `LLM API error or unreachable` | The LLM endpoint is down, the API key is wrong, or the model id is invalid | Curl the endpoint directly, verify the key, and confirm the model id with the provider.                                             |
-| Every command declines with `wall-clock timeout` / `max turns exhausted` | The endpoint is slow or returning non-JSON responses repeatedly      | Lower `MAX_TURNS` for testing, or switch to a smaller / faster model.                                                              |
+| Every command declines with `wall-clock timeout` / `max turns exhausted` | The endpoint is slow, or the model keeps probing without reaching a verdict | Lower `MAX_TURNS` for testing, or switch to a smaller / faster model.                                                              |
+| Every command declines with `no tool_calls in assistant message` (or `Expecting ...`) | The endpoint returned a response the hook could not parse as a tool call — e.g. text-only or malformed JSON in `tool_call.arguments` | Check the model supports OpenAI-style `tool_calls` with `tool_choice: "required"`. Confirm with `curl` that the endpoint returns a `tool_calls` array. If the model emits plain text, the hook will safely `decline` rather than mis-parse. |
 | `reviews.jsonl` not appearing                                    | `PLUGIN_DATA` not set and the fallback dir not writable              | Set `PLUGIN_DATA` explicitly, or `chmod` the fallback dir (`$XDG_DATA_HOME/auto-review/` or `~/.local/share/auto-review/`).         |
 | Hook denied a command the user thinks is safe                    | Static deny-bucket matched a pattern (e.g. `git push -f` to `main`)    | Check the `reason` field in `reviews.jsonl`. If the pattern is wrong, that's a deny-bucket bug — file an issue with the failing command. |
 | `validate.py` reports `hook script is not executable`            | `auto_review.py` lost its exec bit                                    | `chmod +x plugins/auto-review/scripts/auto_review.py`                                                                              |
