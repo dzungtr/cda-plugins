@@ -1,63 +1,62 @@
-# cc-harness
+# cda-plugins repo
 
-This repository is a personal `~/.claude` directory — the global Claude Code configuration that travels with every project.
+This repository is a multi-plugin distribution repo for Claude Code and Codex.
+It ships self-contained plugins under `plugins/`, each installable from the
+same git repository via the harness's native plugin marketplace.
 
-## What lives here
+## Plugins
 
-| Path | Purpose |
-|------|---------|
-| `CLAUDE.md` | Global instructions loaded into every Claude session: workflow rules, agent dispatch patterns, model selection guidelines |
-| `skills/` | Reusable skill definitions (`superpowers:*`, `design-session`, `multi-task`, etc.) invoked via the Skill tool |
-| `agents/` | Agent definitions and supporting docs (e.g. `k8s-troubleshooter.md`) |
-| `commands/` | Custom slash commands |
-| `docs/` | Project documentation including Architecture Decision Records (ADRs) |
-| `hooks/` | Hook scripts run by Claude Code (e.g. `guard-destructive-git.sh`) |
-| `infrastructure/` | Docker Compose and config files for local services (SigNoz observability stack, Memgraph, Milvus) |
-| `scripts/` | Helper shell scripts used by hooks and agents |
-| `settings.json` | Claude Code settings: permissions, hooks, MCP server config, keybindings |
+| Plugin | Path | Harnesses | Purpose |
+|--------|------|-----------|---------|
+| `harness5` | `plugins/harness5/` | Claude Code, Codex | Workflow skills (design-session, multi-task, agentic-memory, memsearch, graphsearch, standup, …) + the `infrastructure/` docker-compose stack (SigNoz, Graphiti memory) |
+| `auto-review` | `plugins/auto-review/` | Codex | LLM auto-review hook for `PermissionRequest` events |
 
-## How it works
+## Install
 
-Claude Code loads `~/.claude/CLAUDE.md` automatically in every project session. That file wires up:
-
-- **Two workflows** — Workflow A (quick background agents) and Workflow B (design-led sessions) — with rules for when to use each
-- **Git worktree isolation** — all PR-bound work runs in `.worktrees/<branch>` inside the project, never on the main checkout
-- **Team-agent dispatch** — tasks that produce a PR are delegated to a named team agent; the main session stays responsive
-- **Security scanning** — Snyk code scan runs on any first-party code added or modified in a supported language
-
-## Skills
-
-Skills are Markdown files that Claude reads on demand when invoked with the Skill tool (or a `/slash-command`). They encode repeatable processes — designing a feature, finishing a branch, running a code review, debugging systematically — so Claude follows the same procedure every time instead of improvising.
-
-## Install as a plugin
-
-`harness5` packages this repo as an installable plugin for both Claude Code and Codex. It ships the shared `skills/` tree and the `infrastructure/` compose stack; it leaves your personal `~/.claude` configuration alone.
-
-### Claude Code
+### Claude Code (harness5 only)
 
 ```sh
-claude plugin marketplace add dzungtr/cc-harness
+claude plugin marketplace add dzungtr/cda-plugins
 claude plugin install harness5
 ```
 
-### Codex
+### Codex (both plugins)
 
 ```sh
-codex plugin marketplace add dzungtr/cc-harness
-codex plugin install harness5
+codex plugin marketplace add dzungtr/cda-plugins
+codex plugin install harness5      # skills + infra stack
+codex plugin install auto-review   # permission auto-review hook
 ```
 
-### Post-install
+### Post-install (harness5)
 
-After either install, run the **`harness5-init`** skill — it scaffolds `infrastructure/.env` from `.env.example`, brings up the shared compose stack, and waits for the SigNoz healthcheck. Once the stack is up:
+After installing `harness5`, run the **`harness5-init`** skill — it scaffolds
+`infrastructure/.env` from `.env.example`, brings up the shared compose stack,
+and waits for the SigNoz healthcheck. Once the stack is up:
 
 - SigNoz UI: <http://localhost:8080> (OTLP via the in-stack collector)
 
-### What ships vs. what stays machine-local
+## Repository layout
 
-- **Ships in the plugin**: `skills/`, `infrastructure/` (compose + configs).
-- **Stays machine-local**: `settings.json`, `agents/`, `commands/`, `hooks/`, `docs/`, `scripts/`, plus caches, sessions, credentials. A live install in Claude Code 2.1.168 confirms the `commands: []` / `agents: []` settings in the manifest suppress the default scan, so those paths do **not** leak into the plugin install — they only matter if you clone or symlink the repo directly as `~/.claude`.
+| Path | Purpose |
+|------|---------|
+| `plugins/harness5/` | harness5 plugin: `skills/`, `infrastructure/`, `.codex-plugin/`, `.claude-plugin/` |
+| `plugins/auto-review/` | auto-review plugin: hook scripts, `.codex-plugin/` |
+| `.claude-plugin/marketplace.json` | Claude Code marketplace (lists harness5) |
+| `.agents/plugins/marketplace.json` | Codex marketplace (lists both plugins) |
+| `docs/adr/` | Architecture Decision Records |
+| `README.md`, `CONTEXT.md` | Repo-level docs |
 
-## Usage
+Repo-root content that is **not** part of any plugin (development-only):
+`settings.json`, `agents/`, `hooks/`, `scripts/`, `.mcp.json`,
+`.memsearch.toml`. These remain at root for local development and are not
+shipped by either plugin.
 
-Clone or symlink this repo to `~/.claude`. Claude Code picks it up automatically on next launch.
+## Design history
+
+- [ADR 0005](docs/adr/0005-harness5-plugin-distribution.md) — original
+  root-native single-plugin decision (superseded for layout by ADR 0007).
+- [ADR 0006](docs/adr/0006-auto-review-llm-permission-agent.md) — auto-review
+  LLM permission agent.
+- [ADR 0007](docs/adr/0007-multi-plugin-layout.md) — multi-plugin layout,
+  relocating harness5 into `plugins/harness5/`.

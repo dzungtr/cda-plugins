@@ -8,7 +8,19 @@
       "name": "harness5",
       "source": {
         "source": "local",
-        "path": "."
+        "path": "plugins/harness5"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "auto-review",
+      "source": {
+        "source": "local",
+        "path": "plugins/auto-review"
       },
       "policy": {
         "installation": "AVAILABLE",

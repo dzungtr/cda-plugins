@@ -142,8 +142,8 @@ The temptation to list files first and infer coverage from names is a known fail
 
 Ambient progress-state, not a decision store: a self-service, non-authoritative catch-net so
 a later cold start (yours or someone else's) can pick up smoothly. Compose service
-(`graphiti-mcp`) lives in `infrastructure/docker-compose.yml`; entity-type schema at
-`infrastructure/config.yaml`; env vars in `infrastructure/.env.example`.
+(`graphiti-mcp`) lives in `plugins/harness5/infrastructure/docker-compose.yml`; entity-type schema at
+`plugins/harness5/infrastructure/config.yaml`; env vars in `plugins/harness5/infrastructure/.env.example`.
 
 When current work is scoped to a GitHub issue/PR/ticket — i.e. the same scope where
 `agentic-memory-read`'s trigger conditions apply (cold start, resuming a ticket, descending

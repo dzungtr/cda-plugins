@@ -8,6 +8,11 @@ description: >
 
 ## 1. Resolve the plugin root
 
+In source layout the plugin lives at `plugins/harness5/`, so `infrastructure/` and `skills/`
+sit directly under the plugin dir. Installed into a harness, the harness sets `PLUGIN_ROOT` /
+`CLAUDE_PLUGIN_ROOT` to that same plugin dir, so the bare `infrastructure/...` paths used by
+this and other skills resolve correctly.
+
 Resolve the installed plugin root from the harness-provided environment variables. Check
 `PLUGIN_ROOT` first because that is the Codex plugin-root variable. If it is unset or empty, check
 `CLAUDE_PLUGIN_ROOT`. Store the first non-empty value as `HARNESS5_PLUGIN_ROOT`:

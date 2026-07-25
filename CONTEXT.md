@@ -1,8 +1,9 @@
-# CONTEXT — myclaude (`~/.claude` global configuration)
+# CONTEXT — cda-plugins repo
 
-This repository is a personal `~/.claude` directory: the global Claude Code
-configuration that travels with every project. It is not an application
-codebase — it holds settings, skills, hooks, scripts, and agent definitions.
+This repository is a multi-plugin distribution repo for Claude Code and Codex.
+Each plugin lives self-contained under `plugins/<name>/`. The glossary below
+covers the observability and harness terms used by the shipped skills; see
+`docs/adr/` for the design history of the plugin layout.
 
 ## Glossary
 
