@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "dzungtr-cc-harness",
-  "version": "0.1.0",
-  "description": "Personal Claude Code marketplace for the cc-harness repo. Adds the harness5 plugin (workflow skills + the infrastructure/ docker-compose stack).",
+  "version": "0.2.0",
+  "description": "Personal Claude Code marketplace for the cc-harness multi-plugin distribution repo. Adds the harness5 plugin (workflow skills + the infrastructure/ docker-compose stack).",
   "owner": {
     "name": "dzungtr",
     "url": "https://github.com/dzungtr"
@@ -10,16 +10,15 @@
   "plugins": [
     {
       "name": "harness5",
-      "description": "cc-harness personal workflow skills plus the infrastructure/ docker-compose stack (LiteLLM gateway, SigNoz, Graphiti memory). The harness5-init skill scaffolds infrastructure/.env from .env.example and brings the compose stack up. Install from this marketplace; the skills appear under the Skill tool without symlinking ~/.claude.",
-      "version": "0.1.1",
+      "description": "cc-harness workflow skills plus the infrastructure/ docker-compose stack (SigNoz, Graphiti memory). The harness5-init skill scaffolds infrastructure/.env from .env.example and brings the compose stack up. Self-contained under plugins/harness5/.",
+      "version": "0.2.0",
       "author": {
         "name": "dzungtr",
         "url": "https://github.com/dzungtr"
       },
-      "source": "./",
+      "source": "./plugins/harness5/",
       "category": "productivity",
       "keywords": [
-        "personal",
         "workflow",
         "agentic-memory",
         "memsearch",

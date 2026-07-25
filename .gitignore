@@ -9,6 +9,11 @@ downloads
 file-history/**/*
 plans/**/*
 plugins/**/*
+# Allow tracked plugins (auto-review, harness5) despite the broad ignore above.
+!plugins/auto-review/
+!plugins/auto-review/**
+!plugins/harness5/
+!plugins/harness5/**
 projects/**/*
 session-env/**/*
 sessions/**/*
