@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Auto Review — Codex PermissionRequest hook (slice #80).
+Auto Review — Codex PermissionRequest hook.
 
 Intercepts Codex PermissionRequest events on Bash and apply_patch tool calls and
 runs a static deny-bucket of universally destructive commands. Anything that
-does not match the deny-bucket is DECLINED (no JSON output, exit 0) so Codex
-falls back to its normal approval prompt.
-
-The LLM agent loop that evaluates non-destructive commands lives in slice #81.
-This slice ships only the scaffold + the deny-bucket + the PermissionRequest
-entry point so the next slice can extend this file in place.
+does not match the deny-bucket is forwarded to a bounded-turn LLM agent loop
+that decides allow / deny via a single native OpenAI-compatible `review` tool
+whose `action` enum is one of `allow` / `deny` / `probe`. On infra failure or
+model uncertainty the hook DECLINES (no JSON output, exit 0) so Codex falls
+back to its normal approval prompt — the user is never worse off than without
+the plugin.
 
 Stdlib only — no third-party dependencies.
 
@@ -38,6 +38,61 @@ from typing import List, Tuple
 MAX_TURNS = 8
 PROBE_OUTPUT_CAP = 4096
 WALL_CLOCK_BUDGET_SECONDS = 30
+# Tool-call capable providers negotiate the verdict via native OpenAI-style
+# `tool_calls` rather than `response_format: json_object`. The previous
+# content-as-JSON protocol broke on responses where `message.content` starts
+# with `<think>...</think>` reasoning text — JSON parsing raised
+# `JSONDecodeError: Expecting value: line 1 column 1 (char 0)` and every
+# review declined. Keep a generous per-request timeout so model round-trips
+# complete inside the wall-clock budget.
+LLM_REQUEST_TIMEOUT_SECONDS = 10
+
+# A single OpenAI-compatible tool schema exposed to the model. We deliberately
+# collapse the decision surface into one tool with an `action` enum instead of
+# three separate `allow` / `deny` / `probe` tools because many models struggle
+# to pick the right tool when the names are similar and live in the same
+# context. With one tool, the model must call it and pick the action — a more
+# reliable decision shape across weaker tool-call capable providers.
+REVIEW_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "review",
+        "description": (
+            "Record the reviewer's decision for a Bash or apply_patch tool call. "
+            "Call this exactly once per turn with one of three actions: 'allow' "
+            "to approve, 'deny' to block, or 'probe' to run a read-only shell "
+            "command before deciding."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["allow", "deny", "probe"],
+                    "description": "The decision the reviewer is recording.",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": (
+                        "Why this action is appropriate. Required when action is "
+                        "'deny'; recommended for 'allow' and 'probe'."
+                    ),
+                },
+                "command": {
+                    "type": "string",
+                    "description": (
+                        "Read-only shell command to run before deciding. Required "
+                        "when action is 'probe'."
+                    ),
+                },
+            },
+            "required": ["action"],
+            "if": {"properties": {"action": {"const": "deny"}}, "required": ["action"]},
+            "then": {"required": ["action", "reason"]},
+            "additionalProperties": False,
+        },
+    },
+}
 LOG_FILE_NAME = "reviews.jsonl"
 SECRET_PATTERN = re.compile(r"KEY|SECRET|TOKEN|PASSWORD|PASSPHRASE|CREDENTIAL|PRIVATE", re.I)
 PROBE_ALLOWLIST = [re.compile(pattern) for pattern in (
@@ -218,6 +273,44 @@ def execute_probe(cmd: str, env_snapshot: dict) -> tuple[str, str]:
         return "", f"probe error: {error}"
 
 
+def _extract_assistant_message(payload: object) -> dict:
+    """Return the assistant message dict from a chat-completions response.
+
+    Preserves the full provider shape — including `content` (which may carry
+    `<think>...</think>` reasoning text), `tool_calls`, and `reasoning_details`
+    — so the message round-trips faithfully into subsequent conversation turns.
+    Returns an empty dict if the response is malformed.
+    """
+    try:
+        message = payload["choices"][0]["message"]  # type: ignore[index]
+    except (KeyError, IndexError, TypeError):
+        return {}
+    return message if isinstance(message, dict) else {}
+
+
+def _parse_first_tool_arguments(message: dict) -> dict:
+    """Return the decoded ``arguments`` object for the first tool call.
+
+    Raises ``ValueError`` when the message has no tool calls and the standard
+    JSON exceptions (``json.JSONDecodeError`` / ``TypeError``) when arguments
+    cannot be decoded as an object. We intentionally do NOT inspect the
+    function name — the upstream model has only one tool (``review``) to call,
+    so the dispatch reads ``arguments.action`` directly.
+    """
+    tool_calls = message.get("tool_calls") or []
+    if not tool_calls:
+        raise ValueError("no tool_calls in assistant message")
+    first = tool_calls[0]
+    function = first.get("function", {}) if isinstance(first, dict) else {}
+    raw_arguments = function.get("arguments", "{}")
+    if not isinstance(raw_arguments, str):
+        raw_arguments = json.dumps(raw_arguments)
+    arguments = json.loads(raw_arguments)
+    if not isinstance(arguments, dict):
+        raise ValueError(f"tool arguments must be an object, got {type(arguments).__name__}")
+    return arguments
+
+
 def run_agent_loop(tool_call: dict, env_snapshot: dict) -> dict:
     base_url = os.environ.get("AUTO_REVIEW_BASE_URL")
     api_key = os.environ.get("AUTO_REVIEW_API_KEY")
@@ -231,27 +324,38 @@ def run_agent_loop(tool_call: dict, env_snapshot: dict) -> dict:
             return {"verdict": "decline", "reason": "wall-clock timeout", "turns": turn - 1}
         request = urllib.request.Request(f"{base_url.rstrip('/')}/chat/completions",
             data=json.dumps({"model": model, "messages": messages,
-                             "response_format": {"type": "json_object"},
+                             "tools": [REVIEW_TOOL], "tool_choice": "required",
                              "max_tokens": 512, "temperature": 0.1}).encode(),
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=3) as response:
+            with urllib.request.urlopen(request, timeout=LLM_REQUEST_TIMEOUT_SECONDS) as response:
                 payload = json.loads(response.read().decode())
-            action_data = json.loads(payload["choices"][0]["message"]["content"])
-        except (OSError, urllib.error.URLError, json.JSONDecodeError, KeyError, IndexError, TypeError) as error:
+            assistant_message = _extract_assistant_message(payload)
+            arguments = _parse_first_tool_arguments(assistant_message)
+        except (OSError, urllib.error.URLError, json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as error:
             return {"verdict": "decline", "reason": str(error), "turns": turn}
-        action = action_data.get("action")
-        if action in ("allow", "deny"):
-            return {"verdict": action, "reason": action_data.get("reason", ""), "turns": turn}
-        messages.append({"role": "assistant", "content": json.dumps(action_data)})
-        if action == "probe" and action_data.get("command"):
-            stdout, stderr = execute_probe(action_data["command"], env_snapshot)
-            feedback = {"stdout": stdout, "stderr": stderr}
-        elif action == "probe":
-            feedback = {"error": "probe missing command"}
-        else:
-            feedback = {"error": f"unknown action: {action}"}
-        messages.append({"role": "user", "content": json.dumps(feedback)})
+        # Preserve the complete assistant message — content, tool_calls, and any
+        # reasoning_details — so the model sees its prior tool calls in history.
+        messages.append(assistant_message)
+        action = arguments.get("action")
+        if action == "allow":
+            return {"verdict": "allow", "reason": str(arguments.get("reason", "")), "turns": turn}
+        if action == "deny":
+            reason = arguments.get("reason")
+            return {"verdict": "deny", "reason": str(reason) if reason else "denied by model", "turns": turn}
+        if action == "probe":
+            command = arguments.get("command", "")
+            if command:
+                stdout, stderr = execute_probe(command, env_snapshot)
+                feedback = {"stdout": stdout, "stderr": stderr}
+            else:
+                feedback = {"error": "probe missing command"}
+            messages.append({"role": "user", "content": json.dumps(feedback)})
+            continue
+        # Missing or unknown action — feed the error back and let the model retry.
+        # MAX_TURNS bounds the total iterations, so this cannot loop forever.
+        messages.append({"role": "user", "content": json.dumps(
+            {"error": f"unknown or missing action: {action!r}"})})
     return {"verdict": "decline", "reason": "max turns exhausted", "turns": MAX_TURNS}
 
 

@@ -52,3 +52,7 @@ skills/to-prd
 skills/triage
 skills/handoff
 infrastructure/volumes/
+
+# Python bytecode caches (auto-review tests, etc.)
+__pycache__/
+*.pyc

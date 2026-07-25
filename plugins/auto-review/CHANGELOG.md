@@ -2,7 +2,64 @@
 
 All notable changes to the `auto-review` Codex plugin.
 
+## [0.2.0] - 2026-07-25
+
+Fixes issue
+[dzungtr/cda-plugins#14](https://github.com/dzungtr/cda-plugins/issues/14):
+the auto-review hook now negotiates verdicts via native OpenAI-compatible
+`tool_calls` instead of the brittle `response_format: json_object` protocol.
+
+### Changed
+
+- **Native tool-call protocol — single `review` tool with an `action` enum.**
+  The hook exposes one `review` tool whose `action` is one of `allow`,
+  `deny`, or `probe`. We deliberately do NOT split this into three separate
+  tools because many tool-call capable models struggle to pick the right
+  one when similar-looking options live in the same context. The request is
+  sent with `tool_choice: "required"` and the verdict is read from
+  `choices[0].message.tool_calls[0].function.arguments.action`.
+- **Full assistant message preserved in history.** `tool_calls`,
+  `reasoning_details`, and `content` (which may carry `<think>...</think>`
+  reasoning text) round-trip into subsequent turns so the model sees its
+  prior decisions.
+- **Per-request timeout raised to 10 seconds** (`LLM_REQUEST_TIMEOUT_SECONDS`)
+  to accommodate tool-capable models that take longer to think before
+  emitting a tool call.
+- **Missing or unknown `action` values** are now fed back as a user-side
+  error within the same `MAX_TURNS` budget (previously only function-name
+  mismatches were fed back).
+
+### Fixed
+
+- `JSONDecodeError: Expecting value: line 1 column 1 (char 0)` no longer
+  fires on tool-capable OpenAI-compatible responses that emit `<think>` text
+  in `message.content`. The hook now declines cleanly with a useful reason
+  when the response has no `tool_calls`.
+
+### Tests
+
+- New `ToolCallProtocolTests` regression suite (8 cases) covers
+  `<think>` content, `reasoning_details` round-trip, plain-content-only
+  responses, empty `tool_calls` lists, malformed JSON in `arguments`,
+  non-object `arguments`, missing `choices`, and `deny` without a `reason`.
+- Existing `AgentLoopTests` rewritten to drive the loop with tool-call
+  payloads and to assert the request body carries `tools` and
+  `tool_choice: "required"` (and not `response_format`).
+- Coverage is now 66/66 tests passing (was 55/55).
+
+### Notes
+
+- Required env vars are unchanged (`AUTO_REVIEW_BASE_URL`,
+  `AUTO_REVIEW_API_KEY`, `AUTO_REVIEW_MODEL`).
+- Compatible with any OpenAI-compatible provider that exposes a `tool_calls`
+  field and supports the `review`-style single-tool pattern — including
+  OpenRouter models with function calling, Ollama's tool-capable models,
+  vLLM with `--enable-auto-tool-choice`, and any other OpenAI-compatible
+  endpoint exposing `tool_calls`.
+
 ## [0.1.0] - 2026-07-22
+
+
 
 Initial release. Delivers the four-slice MVP from epic
 [dzungtr/cc-harness#79](https://github.com/dzungtr/cc-harness/issues/79).
