@@ -10,7 +10,7 @@ harnesses with no duplication.
 
 | Path | Purpose |
 |------|---------|
-| `skills/` | Workflow skills: `design-session`, `multi-task`, `scope-review`, `agentic-memory-*`, `memsearch-*`, `graphsearch-*`, `harness5-init`, `standup`, `autobot`, `langfuse-self-improvement`, `pr-merged-cleanup`, `awsctx`, `sentry-cli` |
+| `skills/` | Workflow skills: `design-session`, `multi-task`, `scope-review`, `agentic-memory-*`, `memsearch-*`, `graphsearch-*`, `harness5-init`, `standup`, `autobot`, `self-improvement`, `pr-merged-cleanup`, `awsctx`, `sentry-cli` |
 | `infrastructure/` | Docker Compose stack + configs (SigNoz, OTel collector, Graphiti memory) |
 | `.codex-plugin/plugin.json` | Codex plugin manifest |
 | `.claude-plugin/plugin.json` | Claude Code plugin manifest |

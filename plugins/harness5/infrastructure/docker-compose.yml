@@ -1,8 +1,8 @@
 # Observability stack (ADR 0004).
 #
-# Langfuse and the intermediary `otelcol` collector have been physically
-# removed (not just profile-gated) — telemetry from Claude Code now goes
-# straight to signoz-otel-collector's in-network OTLP receiver.
+# The previous backend and intermediary `otelcol` collector have been removed;
+# telemetry from Claude Code now goes straight to signoz-otel-collector's
+# in-network OTLP receiver.
 services:
   etcd:
     container_name: milvus-etcd

@@ -71,7 +71,6 @@
       "Bash(openapi-generator-cli *)",
       "Bash(docker *)",
       "Bash(podman *)",
-      "Bash(langfuse *)",
       "Bash(memsearch *)",
       "Bash(graphsearch *)",
       "Bash(podman-compose *)",
