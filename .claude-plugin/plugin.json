@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "harness5",
+  "version": "0.1.1",
+  "description": "cc-harness personal workflow skills (agentic memory, design session, memsearch, scope review, standup, etc.) plus the infrastructure/ docker-compose stack (LiteLLM gateway, SigNoz, Graphiti memory) brought up by the harness5-init skill. Installs the same skills/ tree the repo provides to the owner's personal ~/.claude.",
+  "author": {
+    "name": "dzungtr",
+    "url": "https://github.com/dzungtr"
+  },
+  "homepage": "https://github.com/dzungtr/cc-harness",
+  "repository": "https://github.com/dzungtr/cc-harness",
+  "license": "UNLICENSED",
+  "keywords": [
+    "personal",
+    "workflow",
+    "agentic-memory",
+    "memsearch",
+    "design-session",
+    "infra-stack"
+  ],
+  "skills": "./skills",
+  "commands": [],
+  "agents": [],
+  "hooks": {}
+}

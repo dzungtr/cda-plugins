@@ -1,0 +1,43 @@
+{
+  "_comment_top": "Example .claude/standup.json. Place this at <project-root>/.claude/standup.json. Each datasource entry must define 'name', 'description', and exactly one of ('tool' + 'params') or 'command'.",
+  "datasources": [
+    {
+      "_comment": "Jira via the Atlassian MCP. Used when issues are tracked in Jira.",
+      "name": "qa-bugs",
+      "description": "Open QA bug reports in Jira",
+      "tool": "mcp__plugin_atlassian_atlassian__searchJiraIssuesUsingJql",
+      "params": {
+        "cloudId": "abc-123-cloud-id",
+        "jql": "project = MYAPP AND status in ('To Do','In Progress') AND priority in (High, Highest)"
+      }
+    },
+    {
+      "_comment": "PM-defined feature stories tagged for the current quarter.",
+      "name": "pm-features",
+      "description": "PM-defined feature stories tagged for this quarter",
+      "tool": "mcp__plugin_atlassian_atlassian__searchJiraIssuesUsingJql",
+      "params": {
+        "cloudId": "abc-123-cloud-id",
+        "jql": "project = MYAPP AND issuetype = Story AND labels = 'this-quarter' AND statusCategory != Done"
+      }
+    },
+    {
+      "_comment": "Sentry via sentry-cli. Shell command form. JSON output is preferred.",
+      "name": "prod-errors",
+      "description": "Sentry unresolved errors with >10 occurrences in last 24h",
+      "command": "sentry-cli issues list --org my-org --project my-project --query 'is:unresolved age:-24h timesSeen:>10' --json"
+    },
+    {
+      "_comment": "CloudWatch alarms via aws-cli. Shell command form.",
+      "name": "prod-alarms",
+      "description": "CloudWatch alarms in ALARM state",
+      "command": "aws cloudwatch describe-alarms --state-value ALARM --region us-east-1 --alarm-name-prefix prod- --output json"
+    },
+    {
+      "_comment": "Grafana via curl. Shell command form. Requires GRAFANA_TOKEN and GRAFANA_URL env vars.",
+      "name": "grafana-firing",
+      "description": "Active Grafana alerts",
+      "command": "curl -sf -H \"Authorization: Bearer $GRAFANA_TOKEN\" \"$GRAFANA_URL/api/alertmanager/grafana/api/v2/alerts?active=true\""
+    }
+  ]
+}

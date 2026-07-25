@@ -1,0 +1,34 @@
+{
+  "name": "auto-review",
+  "version": "0.1.0",
+  "description": "Auto-review hook for Codex PermissionRequest events. A static deny-bucket blocks universally destructive commands instantly; everything else is deferred to the user (slice #81 will add a bounded-turn LLM agent loop on top of this scaffold).",
+  "author": {
+    "name": "dzungtr",
+    "url": "https://github.com/dzungtr"
+  },
+  "homepage": "https://github.com/dzungtr/cc-harness",
+  "repository": "https://github.com/dzungtr/cc-harness",
+  "license": "UNLICENSED",
+  "keywords": [
+    "codex",
+    "permission",
+    "auto-review",
+    "hook",
+    "safety"
+  ],
+  "interface": {
+    "displayName": "Auto Review",
+    "shortDescription": "Static deny-bucket auto-review hook for Codex PermissionRequest",
+    "longDescription": "Auto Review intercepts Codex PermissionRequest events on Bash and apply_patch tool calls. Universally destructive commands (rm -rf on /|~|$HOME, force-push to main/master, git reset --hard, git clean -fd/-fx, chmod -R 777 /, dd/mkfs on block devices, fork bombs, curl/wget | bash) are denied instantly by a regex deny-bucket. Everything else is declined (deferred to the normal Codex approval prompt). Slice #81 will layer a bounded-turn LLM agent loop on top of this scaffold to evaluate non-destructive commands automatically.",
+    "developerName": "dzungtr",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read"
+    ],
+    "defaultPrompt": [
+      "What does the auto-review plugin block?",
+      "How do I extend the deny-bucket with my own rules?"
+    ],
+    "websiteURL": "https://github.com/dzungtr/cc-harness"
+  }
+}

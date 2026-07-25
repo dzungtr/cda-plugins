@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cc-observability": {
+      "type": "http",
+      "url": "http://localhost:3018/mcp"
+    }
+  }
+}

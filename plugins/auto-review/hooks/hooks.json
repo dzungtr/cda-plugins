@@ -1,0 +1,18 @@
+{
+  "description": "Auto-review permission hook: intercepts PermissionRequest events and runs a static deny-bucket. Slice #81 adds an LLM agent loop for non-destructive commands.",
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "Bash|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$PLUGIN_ROOT/scripts/auto_review.py\"",
+            "timeout": 30,
+            "statusMessage": "Auto-reviewing tool call..."
+          }
+        ]
+      }
+    ]
+  }
+}

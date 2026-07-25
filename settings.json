@@ -1,0 +1,233 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
+    "OTEL_PROPAGATORS": "tracecontext,baggage",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_TRACES_EXPORTER": "otlp",
+    "OTEL_LOG_TOOL_CONTENT": "1",
+    "OTEL_LOG_RAW_API_BODIES": "1",
+    "CLAUDE_CODE_NO_FLICKER": "1",
+    "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
+    "OTEL_LOG_USER_PROMPTS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Edit(*)",
+      "Write(*)",
+      "Read(*)",
+      "Edit(/tmp/*)",
+      "Write(/tmp/*)",
+      "Read(/tmp/*)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(echo *)",
+      "Bash(open *)",
+      "Bash(jq *)",
+      "Bash(git *)",
+      "Bash(git -C *)",
+      "Bash(gh auth status)",
+      "Bash(gh repo view *)",
+      "Bash(gh api *)",
+      "Bash(gh pr *)",
+      "Bash(gh issue *)",
+      "Bash(gh label *)",
+      "Bash(gh milestone *)",
+      "Bash(gh run view *)",
+      "Bash(gh run list *)",
+      "Bash(command -v *)",
+      "Bash(find *)",
+      "Bash(head *)",
+      "Bash(sort *)",
+      "Bash(awk *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(node *)",
+      "Bash(go -C *)",
+      "Bash(go build *)",
+      "Bash(go run *)",
+      "Bash(go test *)",
+      "Bash(go get *)",
+      "Bash(go vet *)",
+      "Bash(go list *)",
+      "Bash(go mod *)",
+      "Bash(go work *)",
+      "Bash(make *)",
+      "Bash(uv *)",
+      "Bash(npm *)",
+      "Bash(bun *)",
+      "Bash(bunx *)",
+      "Bash(golangci-lint *)",
+      "Bash(conda run *)",
+      "Bash(poetry run *)",
+      "Bash(node *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(npx @changesets/cli *)",
+      "Bash(openapi-generator-cli *)",
+      "Bash(docker *)",
+      "Bash(podman *)",
+      "Bash(langfuse *)",
+      "Bash(memsearch *)",
+      "Bash(graphsearch *)",
+      "Bash(podman-compose *)",
+      "Bash(helm list *)",
+      "Bash(helm ls *)",
+      "Bash(helm status *)",
+      "Bash(helm get *)",
+      "Bash(helm history *)",
+      "Bash(helm search *)",
+      "Bash(helm show *)",
+      "Bash(helm inspect *)",
+      "Bash(helm version)",
+      "Bash(helm version *)",
+      "Bash(helm repo list *)",
+      "Bash(helm repo search *)",
+      "Bash(helm env *)",
+      "Bash(helm template *)",
+      "Bash(helm lint *)",
+      "Bash(helm verify *)",
+      "Bash(helm dependency list *)",
+      "Bash(helm diff *)",
+      "Bash(kubectl *)",
+      "Bash(controller-gen *)",
+      "Bash(kustomize build *)",
+      "Bash(aws sts *)",
+      "Bash(aws logs *)",
+      "Bash(aws cloudwatch describe-*)",
+      "Bash(aws cloudwatch get-*)",
+      "Bash(aws cloudwatch list-*)",
+      "EnterWorktree",
+      "mcp__k8s__*",
+      "mcp__plugin_context7_context7__*",
+      "mcp__claude-in-chrome__navigate",
+      "mcp__claude-in-chrome__read_page",
+      "mcp__claude-in-chrome__read_console_messages",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "Bash(pip show *)",
+      "Bash(pip3 show *)",
+      "Skill",
+      "mcp__cc-observability__*"
+    ],
+    "deny": ["Bash(go install *)", "Bash(rm -rf /)", "Bash(git branch -D main)", "Bash(git -C * branch -D main)"],
+    "defaultMode": "auto"
+  },
+ "model": "sonnet",
+ "hooks": {
+   "PreToolUse": [
+     {
+       "matcher": "Bash",
+       "hooks": [
+         {
+           "type": "command",
+           "command": "context=$(kubectl config current-context 2>/dev/null); if echo \"$context\" | grep -qE '^(kind-|microk8s)'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}'; else echo \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PreToolUse\\\",\\\"permissionDecision\\\":\\\"ask\\\",\\\"permissionDecisionReason\\\":\\\"Current kubectl context is '$context' (not a local kind/microk8s cluster). Manual approval required.\\\"}}\"; fi",
+           "if": "Bash(kubectl apply *)",
+            "timeout": 10,
+            "statusMessage": "Checking kubectl context safety..."
+          },
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/scripts/validate-script.py",
+            "if": "Bash(python *)",
+            "timeout": 10,
+            "statusMessage": "Validating Python script security..."
+          },
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/scripts/validate-script.py",
+            "if": "Bash(python3 *)",
+            "timeout": 10,
+            "statusMessage": "Validating Python script security..."
+          },
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/scripts/validate-script.py",
+            "if": "Bash(python3 -c *)",
+            "timeout": 10,
+            "statusMessage": "Validating Python inline (-c) script security..."
+          },
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/scripts/validate-script.py",
+            "if": "Bash(node *)",
+            "timeout": 10,
+            "statusMessage": "Validating Node.js script security..."
+          },
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/scripts/validate-script.py",
+            "if": "Bash(bun *)",
+            "timeout": 10,
+            "statusMessage": "Validating Bun script security..."
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/scripts/aws-write-approval.sh",
+            "if": "Bash(aws *)",
+            "timeout": 10,
+            "statusMessage": "Checking AWS operation safety..."
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/scripts/curl-localhost-check.sh",
+            "if": "Bash(curl *)",
+            "timeout": 5,
+            "statusMessage": "Checking curl target is localhost..."
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/guard-destructive-git.sh",
+            "if": "Bash(git *)",
+            "timeout": 5,
+            "statusMessage": "Checking git operation safety..."
+          },
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/scripts/cd-command-check.py",
+            "if": "Bash(cd *)",
+            "timeout": 5,
+            "statusMessage": "Checking cd+command..."
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "gopls-lsp@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": false,
+    "superpowers@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "playground@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true
+  },
+  "sandbox": {
+    "network": {
+      "allowedDomains": [
+        "github.com",
+        "*.github.com",
+        "registry.npmjs.org",
+        "npmjs.org",
+        "*.npmjs.org",
+        "charts.helm.sh",
+        "*.helm.sh",
+        "registry-1.docker.io",
+        "docker.io",
+        "*.docker.io",
+        "auth.docker.io",
+        "production.cloudflare.docker.com",
+        "ghcr.io",
+        "*.ghcr.io"
+      ]
+    }
+  },
+  "alwaysThinkingEnabled": true,
+  "tui": "fullscreen",
+  "editorMode": "vim",
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true,
+  "skipWorkflowUsageWarning": true
+}

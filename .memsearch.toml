@@ -1,0 +1,2 @@
+collection = "_claude"
+paths = ["docs/", "CLAUDE.md", "CONTEXT.md"]
