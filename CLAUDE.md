@@ -65,9 +65,11 @@ GitHub Issues, operated through the `gh` CLI, are the backlog and the system of 
 
 ## Pillar 3 — Codebase
 
-PR-bound work is always executed by a background subagent — never inline in the main session. The main session dispatches, reviews, and coordinates.
+Every PR-bound change runs in an isolated git worktree, executed by a background subagent: the worktree + subagent pair is non-negotiable. It keeps `main` clean, isolates concurrent work, and preserves the main session's context for coordination. The main session only dispatches, reviews, and merges; inline edits, root-workspace edits, and edits without a worktree are forbidden.
 
-### Worktrees
+### Worktree operations
+
+These rules operationalize the worktree half of that pattern:
 
 - Put every worktree at `<project-root>/.worktrees/<branch>` so `.worktrees/` sits directly under the repository root, never at a global path or in another tool's configuration directory.
 - Always compute the absolute path with `$(git rev-parse --show-toplevel)/.worktrees/<branch-name>`; never rely on a CWD-relative worktree path.
