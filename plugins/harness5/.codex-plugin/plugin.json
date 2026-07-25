@@ -1,6 +1,6 @@
 {
   "name": "harness5",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "harness5 ships the cda-plugins workflow skills and a local infrastructure stack (OpenTelemetry collector, SigNoz) as a self-contained plugin for Claude Code and Codex, living under plugins/harness5/ in a multi-plugin distribution repo.",
   "author": {
     "name": "dzungtr",

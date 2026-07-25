@@ -63,14 +63,14 @@ class ValidateFailureTests(unittest.TestCase):
     verifies the relevant check goes FAIL.
 
     Tests use ``_copy_plugin_normalized`` which first applies the current
-    expected manifests state (version 0.2.1 + hooks field) before breaking
+    expected manifests state (version 0.2.2 + hooks field) before breaking
     a single precondition. That isolates the assertion: exactly one check
     fails per test.
     """
 
     EXPECTED_CODEX_HOOKS = "./codex/hooks.json"
     EXPECTED_CLAUDE_HOOKS = "./claude/hooks.json"
-    EXPECTED_VERSION = "0.2.1"
+    EXPECTED_VERSION = "0.2.2"
 
     def _copy_plugin(self) -> Path:
         """Copy the plugin tree to a tmp dir so we can mutate it freely."""
