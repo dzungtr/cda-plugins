@@ -163,7 +163,7 @@ services:
       # Overrides the image's baked-in config.yaml. We register only the upstream
       # built-in entity types and rely on scope+recency retrieval + Graphiti's
       # bi-temporal invalidation — no custom decision schema (see docs/adr/0005).
-      - ./config.yaml:/app/mcp/config/config.yaml:ro
+      - ./config.yaml:/app/mcp/config/config.yaml:ro,z
     ports:
       - "${GRAPHITI_MCP_HTTP_PORT:-8121}:8000" # MCP HTTP endpoint at /mcp/
       - "${FALKORDB_REDIS_PORT:-6380}:6379" # FalkorDB/Redis
