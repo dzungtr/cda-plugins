@@ -36,9 +36,9 @@ operating instructions into every Codex and Claude Code session.
 
 ### Notes
 
-- The repo-root `CLAUDE.md` is removed in a follow-up slice (#10) so the
+- The repo-root `CLAUDE.md` was removed in slice #10 so the
   hook becomes the sole source of truth and there is no window where a
-  user's CLAUDE.md auto-load and the hook injection disagree.
+  user's CLAUDE.md auto-load and the hook injection disagree (pre-0.2.2).
 
 ## [0.2.0] - 2026-07-25
 
