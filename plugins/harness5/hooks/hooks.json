@@ -1,0 +1,15 @@
+{
+  "description": "Inject bundled harness5 operating instructions on every Codex session start.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/hooks/loader.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

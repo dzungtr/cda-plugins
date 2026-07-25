@@ -12,6 +12,7 @@ harnesses with no duplication.
 |------|---------|
 | `skills/` | Workflow skills: `design-session`, `multi-task`, `scope-review`, `agentic-memory-*`, `memsearch-*`, `graphsearch-*`, `harness5-init`, `standup`, `autobot`, `self-improvement`, `pr-merged-cleanup`, `awsctx`, `sentry-cli` |
 | `infrastructure/` | Docker Compose stack + configs (SigNoz, OTel collector, Graphiti memory) |
+| `hooks/` | `SessionStart` hook (Codex + Claude Code) + bundled `references/harness5.md` |
 | `.codex-plugin/plugin.json` | Codex plugin manifest |
 | `.claude-plugin/plugin.json` | Claude Code plugin manifest |
 
@@ -47,6 +48,14 @@ plugins/harness5/
 │   └── plugin.json                 # Claude Code manifest (skills: ./skills)
 ├── skills/                         # workflow skills (18 dirs)
 ├── infrastructure/                 # docker-compose.yml, .env.example, signoz/
+├── hooks/                          # SessionStart hook (Codex + Claude Code)
+│   ├── hooks.json                  # Codex hooks config (auto-discovered)
+│   ├── claude/hooks.json           # Claude Code hooks config (manifest-declared)
+│   ├── loader.py                   # shared stdlib-only loader, +x
+│   ├── validate.py                 # plugin self-check (6 checks)
+│   ├── test_loader.py              # loader unit tests
+│   ├── test_validate.py            # self-check unit tests
+│   └── references/harness5.md      # bundled operating instructions
 ├── README.md                       # this file
 └── CHANGELOG.md                    # per-version notes
 ```
@@ -61,6 +70,35 @@ subfolder (ADR 0007) requires no install-side change.
 `CLAUDE_PLUGIN_ROOT` (Claude Code), then expects `infrastructure/` directly
 under that root. Both harnesses set the env var to the installed plugin's own
 directory, so the relocation is transparent to the skill.
+
+## SessionStart hook
+
+Every Codex or Claude Code session with `harness5` installed starts with the
+plugin-bundled operating instructions automatically loaded into context. The
+hook reads `plugins/harness5/hooks/references/harness5.md` (a verbatim copy
+of the harness5 operating rules) and emits it as `additionalContext` on the
+`SessionStart` event. Both harnesses consume the same JSON shape, so a single
+loader at `plugins/harness5/hooks/loader.py` serves both.
+
+- **Bundled instructions** live at
+  `plugins/harness5/hooks/references/harness5.md`. Update there if you change
+  the operating instructions — both harnesses pick them up on the next
+  session start after `plugin update harness5` (or a fresh install).
+- **Failure mode**: if the bundled file is missing or unreadable, the hook
+  emits no JSON, prints a single-line warning to stderr, and exits 0. The
+  session still starts normally — the hook never blocks it.
+- **Size cap**: a soft warning fires to stderr when the file exceeds 32 KiB,
+  but the file is still injected in full (no truncation).
+- **Enablement**:
+  - **Codex**: the hook is auto-discovered. Open Codex and run `/hooks`,
+    locate the `harness5` SessionStart entry, and approve it.
+  - **Claude Code**: the plugin manifest declares the hook path. Set the
+    project to `trust_level = "trusted"` in `~/.claude/settings.json` (or the
+    project's `.claude/settings.json`) so Claude Code will run it.
+
+If you maintain a repo-level `CLAUDE.md` or `AGENTS.md`, prefer the bundled
+`hooks/references/harness5.md` and delete the repo-level copy — having two
+instruction sources causes drift.
 
 ## Related
 
