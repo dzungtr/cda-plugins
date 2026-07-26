@@ -73,7 +73,7 @@ These are denied instantly, before the LLM agent runs. The bucket is pure regex 
 
 ## LLM agent loop
 
-**Protocol** — calls an OpenAI-compatible Chat Completions endpoint (`/chat/completions`) using the native **tool-call** protocol. The hook defines three tools (`allow`, `deny`, `probe`) and sends the request with `tool_choice: "required"` so the model must pick exactly one per turn. The endpoint is the one configured by `AUTO_REVIEW_BASE_URL` (see [Configuration](#configuration)).
+**Protocol** — drives the official [Z.ai Python SDK](https://docs.z.ai/guides/capabilities/function-calling) (`from zai import ZaiClient`) to call a Chat Completions endpoint (`$AUTO_REVIEW_BASE_URL/chat/completions`) using the native **tool-call** protocol. The SDK is installed via `plugins/auto-review/requirements.txt` (`zai-sdk>=0.2.3`); the configured base URL is passed through the SDK so any OpenAI-compatible provider works. The hook exposes a single `review` tool and sends the request with `tool_choice: "required"` so the model must call it on every turn. See [Configuration](#configuration) for endpoint setup, [Troubleshooting](#troubleshooting) for the SDK-missing case.
 
 **Why tool calls instead of `response_format: json_object`?** Tool-call capable providers — including any OpenAI-compatible endpoint that exposes a `tool_calls` field — return their decision through `choices[0].message.tool_calls[*].function`, and may emit interleaved reasoning (`<think>...</think>` text in `message.content`, plus `reasoning_details`). Parsing `message.content` as JSON breaks on those responses with `JSONDecodeError`. Tool calls keep the verdict in a structured envelope and let the rest of the assistant message round-trip faithfully into history.
 
@@ -147,7 +147,15 @@ export AUTO_REVIEW_API_KEY="EMPTY"                # vLLM default; any non-empty 
 export AUTO_REVIEW_MODEL="meta-llama/Meta-Llama-3-8B-Instruct"
 ```
 
-Any OpenAI-compatible endpoint works. Set them in your shell profile (`~/.zshrc`, `~/.bashrc`) or in Codex's process environment.
+**Z.ai (the SDK's first-party provider, recommended when you have a Z.ai account):**
+
+```bash
+export AUTO_REVIEW_BASE_URL="https://api.z.ai/api/paas/v4"
+export AUTO_REVIEW_API_KEY="<your-zai-api-key>"
+export AUTO_REVIEW_MODEL="glm-4.6"          # or any tool-capable Z.ai model
+```
+
+Any OpenAI-compatible endpoint works — the configured `AUTO_REVIEW_BASE_URL` is passed straight through `zai.ZaiClient(base_url=...)`, so the same hook talks to Z.ai, OpenRouter, Ollama, vLLM, or a self-hosted server without code changes. Set them in your shell profile (`~/.zshrc`, `~/.bashrc`) or in Codex's process environment.
 
 ## Decision log
 
@@ -199,7 +207,13 @@ url = "https://github.com/dzungtr/cc-harness"
 enabled = true
 ```
 
-**3. Set the LLM endpoint env vars** (see [Configuration](#configuration)) in the environment Codex inherits (your shell profile, `~/.codex/.env`, or the launcher script).
+**3. Install the Z.ai Python SDK and set the LLM endpoint env vars.**
+
+   ```bash
+   /usr/bin/python3 -m pip install -r plugins/auto-review/requirements.txt
+   ```
+
+   The requirements file requires `zai-sdk>=0.2.3` (the official SDK; the bare `zai` distribution on PyPI is an unrelated 2018 placeholder and is NOT what this hook imports). The static deny-bucket still works without the SDK — only the agent loop declines cleanly with a `zai-sdk is required` reason when it is missing — but installing it lets the hook actually call the model. Then set the three env vars from [Configuration](#configuration) in the environment Codex inherits (your shell profile, `~/.codex/.env`, or the launcher script).
 
 **4. Trust the hook.** Codex requires non-managed hooks to be explicitly trusted before they run. Open the Codex CLI and run:
 
@@ -220,16 +234,17 @@ plugins/auto-review/
 ├── hooks/
 │   └── hooks.json                     # wires auto_review.py to PermissionRequest
 ├── scripts/
-│   ├── auto_review.py                 # deny-bucket + agent loop + decision logger
-│   ├── test_agent_loop.py             # tests: agent loop, deny-bucket, probe allowlist, snapshot
+│   ├── auto_review.py                 # deny-bucket + agent loop (Z.ai SDK) + decision logger
+│   ├── test_agent_loop.py             # tests: agent loop, deny-bucket, probe allowlist, snapshot, SDK conversion
 │   ├── test_logger.py                 # tests: log_decision + main() log-on-every-path wiring
 │   ├── test_validate.py               # tests: validate.py (plugin self-check)
 │   └── validate.py                    # self-check (plugin-specific; complements Codex's validator)
+├── requirements.txt                   # runtime dep: zai-sdk (the official Z.ai Python SDK)
 ├── README.md                          # this file
 └── CHANGELOG.md                       # per-version notes
 ```
 
-The `auto_review.py` hook is the only runtime entry point. The test files are stdlib-only (`unittest`) and are run with `python3 -m unittest discover` from inside `scripts/`.
+The `auto_review.py` hook is the only runtime entry point. The test files are stdlib-only (`unittest`); the hook itself depends on `zai-sdk` from `requirements.txt`. Run the full suite with `python3 -m unittest discover -s plugins/auto-review/scripts -p 'test_*.py'`.
 
 ## Self-validation
 
@@ -255,7 +270,9 @@ Two validators can be run against the plugin tree:
 |------------------------------------------------------------------|-----------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
 | Codex shows the normal approval prompt for every command         | The hook isn't trusted yet — `/hooks` step was skipped                | Run `/hooks` in the Codex CLI and trust the `auto-review` `PermissionRequest` entry.                                               |
 | Every command declines, log shows `missing env vars`             | `AUTO_REVIEW_BASE_URL` / `AUTO_REVIEW_API_KEY` / `AUTO_REVIEW_MODEL` not set in Codex's env | Export the three vars in the environment Codex inherits (shell profile, launcher, `~/.codex/.env`).                                  |
-| Every command declines, log shows `LLM API error or unreachable` | The LLM endpoint is down, the API key is wrong, or the model id is invalid | Curl the endpoint directly, verify the key, and confirm the model id with the provider.                                             |
+| Every command declines, log shows `zai-sdk is required ... No module named 'zai'` | The `zai-sdk` Python package is not installed in Codex's interpreter | Run `/usr/bin/python3 -m pip install -r plugins/auto-review/requirements.txt`, matching the interpreter used by `hooks/hooks.json`. The static deny-bucket still fires without the SDK — only the LLM agent stage declines. |
+| Every command declines, log shows `zai package is installed but does not export ZaiClient` | The wrong package is installed: the bare `zai` distribution on PyPI is an unrelated 2018 placeholder, NOT the SDK | Uninstall it (`/usr/bin/python3 -m pip uninstall zai`) and install the official SDK: `/usr/bin/python3 -m pip install -r plugins/auto-review/requirements.txt` (which requires at least `zai-sdk>=0.2.3`). |
+| Every command declines, log shows `LLM API error or unreachable` | The endpoint is unreachable from Codex's process, the API key is wrong, the model id is invalid, or the SDK raised an unexpected error | Curl the configured `AUTO_REVIEW_BASE_URL/chat/completions` directly with the same key/model to verify, then check `reviews.jsonl` for the declined `reason` (it carries the SDK's error message verbatim). |
 | Every command declines with `wall-clock timeout` / `max turns exhausted` | The endpoint is slow, or the model keeps probing without reaching a verdict | Lower `MAX_TURNS` for testing, or switch to a smaller / faster model.                                                              |
 | Every command declines with `no tool_calls in assistant message` (or `Expecting ...`) | The endpoint returned a response the hook could not parse as a tool call — e.g. text-only or malformed JSON in `tool_call.arguments` | Check the model supports OpenAI-style `tool_calls` with `tool_choice: "required"`. Confirm with `curl` that the endpoint returns a `tool_calls` array. If the model emits plain text, the hook will safely `decline` rather than mis-parse. |
 | `reviews.jsonl` not appearing                                    | `PLUGIN_DATA` not set and the fallback dir not writable              | Set `PLUGIN_DATA` explicitly, or `chmod` the fallback dir (`$XDG_DATA_HOME/auto-review/` or `~/.local/share/auto-review/`).         |

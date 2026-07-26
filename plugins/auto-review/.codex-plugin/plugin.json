@@ -1,7 +1,7 @@
 {
   "name": "auto-review",
-  "version": "0.2.0",
-  "description": "Auto-review hook for Codex PermissionRequest events. A static deny-bucket blocks universally destructive commands instantly; everything else is decided by a bounded-turn LLM agent loop using native OpenAI-compatible tool calls (allow / deny / probe).",
+  "version": "0.3.0",
+  "description": "Auto-review hook for Codex PermissionRequest events. A static deny-bucket blocks universally destructive commands instantly; everything else is decided by a bounded-turn LLM agent loop using the official Z.ai Python SDK (`from zai import ZaiClient`) and native function tools (a single `review` tool with an `action` enum: allow / deny / probe).",
   "author": {
     "name": "dzungtr",
     "url": "https://github.com/dzungtr"
@@ -18,8 +18,8 @@
   ],
   "interface": {
     "displayName": "Auto Review",
-    "shortDescription": "Single-tool LLM auto-review hook for Codex PermissionRequest (allow / deny / probe via action enum)",
-    "longDescription": "Auto Review intercepts Codex PermissionRequest events on Bash and apply_patch tool calls. Universally destructive commands (rm -rf on /|~|$HOME, force-push to main/master, git reset --hard, git clean -fd/-fx, chmod -R 777 /, dd/mkfs on block devices, fork bombs, curl/wget | bash) are denied instantly by a regex deny-bucket. Everything else is decided by a bounded-turn LLM agent loop (max 8 turns, 30s wall-clock, 10s per request) that exposes a single OpenAI-compatible `review` tool with an `action` enum (`allow` / `deny` / `probe`) \u2014 so it works with any tool-capable OpenAI-compatible provider. On uncertainty or infra failure the hook declines and Codex shows its normal approval prompt.",
+    "shortDescription": "Z.ai-SDK-driven LLM auto-review hook for Codex PermissionRequest (allow / deny / probe via action enum)",
+    "longDescription": "Auto Review intercepts Codex PermissionRequest events on Bash and apply_patch tool calls. Universally destructive commands (rm -rf on /|~|$HOME, force-push to main/master, git reset --hard, git clean -fd/-fx, chmod -R 777 /, dd/mkfs on block devices, fork bombs, curl/wget | bash) are denied instantly by a regex deny-bucket. Everything else is decided by a bounded-turn LLM agent loop (max 8 turns, 30s wall-clock, 10s per request) that uses the official Z.ai Python SDK (`zai-sdk`) to drive `client.chat.completions.create(...)` with a single `review` tool whose `action` enum is `allow` / `deny` / `probe`. The configured AUTO_REVIEW_BASE_URL is passed through the SDK, so the hook works with any OpenAI-compatible provider (Z.ai, OpenRouter, Ollama, vLLM). On uncertainty or infra failure the hook declines and Codex shows its normal approval prompt.",
     "developerName": "dzungtr",
     "category": "Developer Tools",
     "capabilities": [

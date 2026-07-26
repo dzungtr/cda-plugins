@@ -1,5 +1,75 @@
 # Changelog
 
+## [0.3.0] - 2026-07-26
+
+Adopts the official Z.ai Python SDK for the agent loop. The hook still
+drives a single native `review` tool with an `action` enum over an
+OpenAI-compatible chat-completions endpoint, but it now goes through
+`from zai import ZaiClient` and `client.chat.completions.create(...)`
+instead of a hand-rolled `urllib.request` HTTP call. The configured
+`AUTO_REVIEW_BASE_URL` is passed straight through the SDK so the same
+hook drives Z.ai, OpenRouter, Ollama, vLLM, or any OpenAI-compatible
+endpoint.
+
+### Changed
+
+- **Z.ai Python SDK replaces the hand-rolled urllib path.** `run_agent_loop`
+  now constructs `zai.ZaiClient(api_key=..., base_url=...)` and calls
+  `client.chat.completions.create(model=..., messages=..., tools=[...],
+  tool_choice="required", max_tokens=512, temperature=0.1, timeout=...)`.
+  The SDK client disables its default retries (`max_retries=0`) so the
+  hook's 30-second wall-clock budget remains authoritative.
+  The SDK response is normalised via `to_dict()` (or `model_dump` as a
+  fallback) so the existing `_extract_assistant_message` /
+  `_parse_first_tool_arguments` helpers, message history, and full
+  assistant-message round-trip (content / `tool_calls` /
+  `reasoning_details`) are preserved unchanged.
+- **Plugin is no longer stdlib-only.** `plugins/auto-review/requirements.txt`
+  requires `zai-sdk>=0.2.3` (the official SDK; the bare `zai` distribution on
+  PyPI is an unrelated 2018 placeholder and is NOT what this hook imports).
+  Installation step is added to the README and targets the `/usr/bin/python3`
+  interpreter used by the hook command.
+- **Static deny-bucket remains SDK-independent.** The Z.ai SDK is imported
+  lazily inside `run_agent_loop` only; if it is missing or fails to import,
+  the hook declines with a helpful `zai-sdk is required ...` reason and
+  Codex's normal approval prompt appears. The deny-bucket, decision
+  logger, and every other code path work without the SDK.
+
+### Tests
+
+- `test_agent_loop.py` rewritten to mock the SDK (`ZaiClient` /
+  `chat.completions.create`) instead of `urllib.request.urlopen`.
+  Coverage now includes SDK construction kwargs (api_key + rstripped
+  base_url), request body (model / tools / tool_choice / max_tokens /
+  temperature / timeout), assistant-message round-trip across probe
+  turns (including `reasoning_details`), SDK import failure (both
+  `ImportError` and the placeholder-package case), `ZaiClient`
+  constructor failure, transport errors (httpx-style
+  `ConnectionError` / `TimeoutError`), unexpected SDK exceptions, plain
+  content-only responses, empty `tool_calls`, malformed JSON in
+  `arguments`, non-object arguments, missing `choices`, missing `action`,
+  and `deny` without `reason`. New `SdkConversionTests` cover the
+  `_completion_to_payload` helper directly. Total suite is 84/84
+  passing (was 68/68).
+- `test_validate.py` adds 5 new cases for the `requirements` validator
+  check: missing file, missing `zai-sdk` package, comments+extras OK,
+  pinned version OK, environment-marker OK. Total validator suite is
+  25/25 passing (was 20/20).
+- `validate.py` now fails fast when `requirements.txt` is missing or
+  omits a required package — preventing silent dependency drift.
+
+### Notes
+
+- Required env vars are unchanged (`AUTO_REVIEW_BASE_URL`,
+  `AUTO_REVIEW_API_KEY`, `AUTO_REVIEW_MODEL`).
+- Compatible with any OpenAI-compatible provider that the Z.ai SDK
+  speaks to, including Z.ai first-party (`https://api.z.ai/api/paas/v4`),
+  OpenRouter, Ollama (tool-capable models), and vLLM with
+  `--enable-auto-tool-choice`.
+- Wall-clock budget (30 s), per-request timeout (10 s), and turn budget
+  (8) are unchanged.
+
+
 All notable changes to the `auto-review` Codex plugin.
 
 ## [0.2.0] - 2026-07-25

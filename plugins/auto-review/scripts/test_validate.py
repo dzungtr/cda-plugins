@@ -45,6 +45,7 @@ def _make_fake_plugin(root: Path) -> None:
     (root / "README.md").write_text(
         "AUTO_REVIEW_BASE_URL docs\nAUTO_REVIEW_API_KEY docs\nAUTO_REVIEW_MODEL docs\n"
     )
+    (root / "requirements.txt").write_text("zai-sdk>=0.2.3\n")
 
 
 class HappyPathTests(unittest.TestCase):
@@ -55,7 +56,7 @@ class HappyPathTests(unittest.TestCase):
         with redirect_stdout(out), redirect_stderr(err):
             rc = validate.run(PLUGIN_ROOT)
         self.assertEqual(rc, 0, msg=f"stdout={out.getvalue()!r} stderr={err.getvalue()!r}")
-        self.assertIn("all 6 checks passed", out.getvalue())
+        self.assertIn("all 7 checks passed", out.getvalue())
 
     def test_main_no_args_infers_plugin_root(self):
         out, err = io.StringIO(), io.StringIO()
@@ -175,6 +176,44 @@ class NegativeCaseTests(unittest.TestCase):
         self.assertIn("[FAIL] tests", out)
         self.assertIn("no test files found", out)
 
+    def test_missing_requirements_file(self):
+        (self.root / "requirements.txt").unlink()
+        rc, out, _ = self._run()
+        self.assertEqual(rc, 1)
+        self.assertIn("[FAIL] requirements", out)
+        self.assertIn("missing requirements.txt", out)
+
+    def test_requirements_missing_sdk_package(self):
+        # requirements.txt exists but omits zai-sdk — must fail.
+        (self.root / "requirements.txt").write_text("# nothing here\nhttpx>=0.27\n")
+        rc, out, _ = self._run()
+        self.assertEqual(rc, 1)
+        self.assertIn("[FAIL] requirements", out)
+        self.assertIn("zai-sdk", out)
+
+    def test_requirements_with_comments_and_extras_is_ok(self):
+        # Comments, blank lines, and extras must not break the parser.
+        (self.root / "requirements.txt").write_text(
+            "# Pin the Z.ai SDK for the agent loop\n"
+            "\n"
+            "zai-sdk>=0.2.3  # official Python SDK\n"
+            "httpx>=0.27  # transitive but pinned for reproducibility\n"
+        )
+        rc, out, _ = self._run()
+        self.assertEqual(rc, 0, msg=out)
+        self.assertIn("[PASS] requirements", out)
+
+    def test_requirements_with_pinned_version_is_ok(self):
+        (self.root / "requirements.txt").write_text("zai-sdk==0.2.3\n")
+        rc, out, _ = self._run()
+        self.assertEqual(rc, 0, msg=out)
+
+    def test_requirements_with_marker_is_ok(self):
+        # Environment markers are tolerated.
+        (self.root / "requirements.txt").write_text('zai-sdk>=0.2.3; python_version >= "3.8"\n')
+        rc, out, _ = self._run()
+        self.assertEqual(rc, 0, msg=out)
+
     def test_missing_readme(self):
         (self.root / "README.md").unlink()
         rc, out, _ = self._run()
@@ -215,6 +254,17 @@ class NegativeCaseTests(unittest.TestCase):
         self.assertIn("[FAIL] tests", out)
         # Summary lists both labels.
         self.assertIn("readme", err)
+        self.assertIn("tests", err)
+
+    def test_requirements_and_tests_both_fail(self):
+        # Drop requirements.txt + tests so both new and existing checks fail.
+        (self.root / "requirements.txt").unlink()
+        (self.root / "scripts" / "test_smoke.py").unlink()
+        rc, out, err = self._run()
+        self.assertEqual(rc, 1)
+        self.assertIn("[FAIL] requirements", out)
+        self.assertIn("[FAIL] tests", out)
+        self.assertIn("requirements", err)
         self.assertIn("tests", err)
 
 
