@@ -23,7 +23,7 @@ An LLM-agent-based auto-review hook for Codex `PermissionRequest` events. It den
 When Codex is about to ask for approval on a tool call, the auto-review hook intercepts it and runs a two-stage evaluation:
 
 1. **Static deny-bucket** (instant, no LLM): universally destructive commands are denied immediately via regex matching.
-2. **LLM agent loop** (everything else): a bounded-turn agent (max 8 turns, 30s timeout) evaluates the command using an OpenAI-compatible model. It can probe the read-only environment before deciding to allow, deny, or defer to the human.
+2. **LLM agent loop** (everything else): a bounded-turn agent (max 8 turns, 60s timeout) evaluates the command using an OpenAI-compatible model. It can probe the read-only environment before deciding to allow, deny, or defer to the human.
 
 ## How the two-stage review works
 
@@ -38,7 +38,7 @@ PermissionRequest
      no hit
        │
        ▼
-   run_agent_loop  (≤8 turns, 30s wall-clock)
+   run_agent_loop  (≤8 turns, 60s wall-clock)
        │
        ├─ allow   ──▶ output_allow  (skip approval prompt, log)
        ├─ deny    ──▶ output_deny   (block, log)
@@ -87,13 +87,13 @@ These are denied instantly, before the LLM agent runs. The bucket is pure regex 
 
 **Bounded execution** — `MAX_TURNS = 8`. The agent exits immediately on `allow` or `deny`. On `probe` it executes the command, appends the result to the conversation, and continues. If the model returns a missing or unknown `action`, or `action="probe"` with no `command`, the loop feeds the error back to the model and continues — it does not silently auto-approve or auto-deny.
 
-**Per-request timeout** — `LLM_REQUEST_TIMEOUT_SECONDS = 10`. Each LLM call has its own 10-second deadline so the model has room to think while still fitting inside the wall-clock budget.
+**Per-request timeout** — `LLM_REQUEST_TIMEOUT_SECONDS = 20`. Each LLM call has its own 20-second deadline so the model has room to think while still fitting inside the wall-clock budget.
 
-**Wall-clock budget** — `WALL_CLOCK_BUDGET_SECONDS = 30`. The loop checks elapsed time before each LLM call. If the budget is exhausted, the network errors out, the response has no `tool_calls`, or `tool_call.arguments` is malformed JSON, the loop returns `decline` so the user gets the normal approval prompt. Logging failure is non-fatal.
+**Wall-clock budget** — `WALL_CLOCK_BUDGET_SECONDS = 60`. The loop checks elapsed time before each LLM call. If the budget is exhausted, the network errors out, the response has no `tool_calls`, or `tool_call.arguments` is malformed JSON, the loop returns `decline` so the user gets the normal approval prompt. Logging failure is non-fatal.
 
 **Environment snapshot** — the first message to the model includes a redacted environment snapshot (keys matching `KEY|SECRET|TOKEN|PASSWORD|PASSPHRASE|CREDENTIAL|PRIVATE` are replaced with `<redacted>`), plus the repo root, current branch, `git status --porcelain`, and the last five `git log --oneline` lines.
 
-**Model parameters** — `temperature: 0.1`, `max_tokens: 512`. Low temperature keeps the agent's verdicts stable; the cap prevents runaway generation from eating the 30s budget.
+**Model parameters** — `temperature: 0.1`, `max_tokens: 512`. Low temperature keeps the agent's verdicts stable; the cap prevents runaway generation from eating the 60s budget.
 
 **Decline-on-failure** — missing env vars, timeout, HTTP error, malformed JSON, missing model keys, or any uncaught exception → `decline`. The agent only denies when it can articulate a concrete reason; when in doubt, it defers to the human.
 

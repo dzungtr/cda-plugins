@@ -40,7 +40,7 @@ from typing import List, Tuple
 
 MAX_TURNS = 8
 PROBE_OUTPUT_CAP = 4096
-WALL_CLOCK_BUDGET_SECONDS = 30
+WALL_CLOCK_BUDGET_SECONDS = 60
 # Tool-call capable providers negotiate the verdict via native OpenAI-style
 # `tool_calls` rather than `response_format: json_object`. The previous
 # content-as-JSON protocol broke on responses where `message.content` starts
@@ -48,7 +48,7 @@ WALL_CLOCK_BUDGET_SECONDS = 30
 # `JSONDecodeError: Expecting value: line 1 column 1 (char 0)` and every
 # review declined. Keep a generous per-request timeout so model round-trips
 # complete inside the wall-clock budget.
-LLM_REQUEST_TIMEOUT_SECONDS = 10
+LLM_REQUEST_TIMEOUT_SECONDS = 20
 
 # A single OpenAI-compatible tool schema exposed to the model. We deliberately
 # collapse the decision surface into one tool with an `action` enum instead of
