@@ -6,8 +6,8 @@
     "name": "dzungtr",
     "url": "https://github.com/dzungtr"
   },
-  "homepage": "https://github.com/dzungtr/cda-plugins",
-  "repository": "https://github.com/dzungtr/cda-plugins",
+  "homepage": "https://github.com/dzungtr/harness6",
+  "repository": "https://github.com/dzungtr/harness6",
   "license": "UNLICENSED",
   "keywords": [
     "codex",
@@ -29,6 +29,6 @@
       "What does the auto-review plugin block?",
       "How do I extend the deny-bucket with my own rules?"
     ],
-    "websiteURL": "https://github.com/dzungtr/cda-plugins"
+    "websiteURL": "https://github.com/dzungtr/harness6"
   }
 }

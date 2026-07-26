@@ -1,7 +1,7 @@
 {
-  "name": "cda-plugins",
+  "name": "harness6",
   "interface": {
-    "displayName": "cda-plugins"
+    "displayName": "harness6"
   },
   "plugins": [
     {

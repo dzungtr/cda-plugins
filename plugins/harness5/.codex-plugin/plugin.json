@@ -1,16 +1,16 @@
 {
   "name": "harness5",
   "version": "0.2.2",
-  "description": "harness5 ships the cda-plugins workflow skills and a local infrastructure stack (OpenTelemetry collector, SigNoz) as a self-contained plugin for Claude Code and Codex, living under plugins/harness5/ in a multi-plugin distribution repo.",
+  "description": "harness5 ships the harness6 workflow skills and a local infrastructure stack (OpenTelemetry collector, SigNoz) as a self-contained plugin for Claude Code and Codex, living under plugins/harness5/ in a multi-plugin distribution repo.",
   "author": {
     "name": "dzungtr",
     "url": "https://github.com/dzungtr"
   },
-  "homepage": "https://github.com/dzungtr/cda-plugins",
-  "repository": "https://github.com/dzungtr/cda-plugins",
+  "homepage": "https://github.com/dzungtr/harness6",
+  "repository": "https://github.com/dzungtr/harness6",
   "keywords": [
     "harness5",
-    "cda-plugins",
+    "harness6",
     "skills",
     "infrastructure",
     "claude-code",
@@ -19,8 +19,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "harness5",
-    "shortDescription": "cda-plugins workflow skills and local infra stack (OTel, SigNoz) for Claude Code and Codex.",
-    "longDescription": "harness5 is the cda-plugins workflow-skills and infrastructure plugin, packaged self-contained under plugins/harness5/. The same skills/ and infrastructure/ tree ships to both Claude Code and Codex. After a fresh install, run the harness5-init skill to scaffold infrastructure/.env from .env.example and bring the docker compose stack (OpenTelemetry collector, SigNoz) up as a shared local instance.",
+    "shortDescription": "harness6 workflow skills and local infra stack (OTel, SigNoz) for Claude Code and Codex.",
+    "longDescription": "harness5 is the harness6 workflow-skills and infrastructure plugin, packaged self-contained under plugins/harness5/. The same skills/ and infrastructure/ tree ships to both Claude Code and Codex. After a fresh install, run the harness5-init skill to scaffold infrastructure/.env from .env.example and bring the docker compose stack (OpenTelemetry collector, SigNoz) up as a shared local instance.",
     "developerName": "dzungtr",
     "category": "Developer Tools",
     "capabilities": [
@@ -33,6 +33,6 @@
       "List the skills available in harness5.",
       "What infrastructure services does harness5 start?"
     ],
-    "websiteURL": "https://github.com/dzungtr/cda-plugins"
+    "websiteURL": "https://github.com/dzungtr/harness6"
   }
 }
