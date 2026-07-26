@@ -225,9 +225,10 @@ class AgentLoopTests(unittest.TestCase):
 
     def test_wall_clock_timeout(self):
         # The SDK import step runs before the loop body, so we must stub it.
+        # Wall-clock budget is 60s; return 61s on the first check to force a decline.
         client = _build_loop_client([review_response(action="allow", reason="ok")])
         with mock.patch.object(auto_review, "_build_client", return_value=client), \
-             mock.patch("auto_review.time.monotonic", side_effect=[0, 31]):
+             mock.patch("auto_review.time.monotonic", side_effect=[0, 61]):
             result = auto_review.run_agent_loop(self.tool, self.snapshot)
         self.assertEqual((result["verdict"], result["reason"], result["turns"]),
                          ("decline", "wall-clock timeout", 0))

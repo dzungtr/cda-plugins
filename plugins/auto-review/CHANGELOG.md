@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.1] - 2026-07-26
+
+Bumps the agent loop's timing budgets to give larger / slower models room
+to reason through a review without the hook prematurely declining. The
+deny-bucket, decision shape, and SDK path are unchanged.
+
+### Changed
+
+- **`WALL_CLOCK_BUDGET_SECONDS` raised from 30 to 60.** The full agent
+  loop now has a 60-second wall-clock budget before it declines with
+  `wall-clock timeout`. The check still runs before every LLM call, so a
+  long-running probe + model round-trip sequence no longer gets cut off
+  at 30s on slower endpoints.
+- **`LLM_REQUEST_TIMEOUT_SECONDS` raised from 10 to 20.** Each individual
+  `client.chat.completions.create(...)` call now has a 20-second deadline,
+  doubling the per-request budget so models that need to think for several
+  seconds before producing a `tool_call` can still finish inside the
+  wall-clock budget. The previous 10s was tight for some reasoning models
+  whose first response arrived just past the deadline, causing every
+  review to decline.
+
 ## [0.3.0] - 2026-07-26
 
 Adopts the official Z.ai Python SDK for the agent loop. The hook still
