@@ -13,7 +13,7 @@ services:
       - ETCD_QUOTA_BACKEND_BYTES=4294967296
       - ETCD_SNAPSHOT_COUNT=50000
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/etcd:/etcd:z
+      - etcd_data:/etcd:z
     command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
     healthcheck:
       test: ["CMD", "etcdctl", "endpoint", "health"]
@@ -31,7 +31,7 @@ services:
       - "9001:9001"
       - "9000:9000"
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/minio:/minio_data:z
+      - milvus_minio_data:/minio_data:z
     command: minio server /minio_data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -54,7 +54,7 @@ services:
       ETCD_USE_AUTH: "false"
       MINIO_ADDRESS: milvus-minio:9000
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/milvus:/var/lib/milvus:z
+      - milvus_data:/var/lib/milvus:z
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
       interval: 30s
@@ -95,9 +95,9 @@ services:
       - "3014:3000" # Bolt protocol
       - "7444:7444" # HTTP monitoring
     volumes:
-      - ./volumes/memgraph/data:/var/lib/memgraph:z
-      - ./volumes/memgraph/log:/var/log/memgraph:z
-      - ./volumes/memgraph/etc:/etc/memgraph:z
+      - memgraph_data:/var/lib/memgraph:z
+      - memgraph_log:/var/log/memgraph:z
+      - memgraph_etc:/etc/memgraph:z
     healthcheck:
       test:
         [
@@ -404,3 +404,16 @@ volumes:
     driver: local
   signoz_sqlite_data:
     driver: local
+  etcd_data:
+    driver: local
+  milvus_minio_data:
+    driver: local
+  milvus_data:
+    driver: local
+  memgraph_data:
+    driver: local
+  memgraph_log:
+    driver: local
+  memgraph_etc:
+    driver: local
+
