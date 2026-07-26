@@ -11,7 +11,10 @@ model uncertainty the hook DECLINES (no JSON output, exit 0) so Codex falls
 back to its normal approval prompt — the user is never worse off than without
 the plugin.
 
-Stdlib only — no third-party dependencies.
+Uses the official Z.ai Python SDK (`from zai import ZaiClient`) to drive
+the bounded-turn LLM agent loop. The SDK is an OPTIONAL dependency —
+the static deny-bucket continues to work without it; the agent loop
+declines cleanly when the SDK is missing.
 
 Output contract:
   Allow:  {"hookSpecificOutput":{"hookEventName":"PermissionRequest",
@@ -31,8 +34,8 @@ import re
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
+import importlib
+from typing import Any
 from typing import List, Tuple
 
 MAX_TURNS = 8
@@ -310,6 +313,69 @@ def _parse_first_tool_arguments(message: dict) -> dict:
         raise ValueError(f"tool arguments must be an object, got {type(arguments).__name__}")
     return arguments
 
+def _import_zai_client():
+    """Lazily import ``zai.ZaiClient``.
+
+    The Z.ai SDK is an optional dependency. We import it on demand so the
+    static deny-bucket continues to work without it; when the import fails
+    or the SDK is not installed the caller must decline cleanly rather
+    than crash the hook.
+    """
+    try:
+        module = importlib.import_module("zai")
+    except ImportError as error:
+        raise ImportError(
+            f"zai-sdk is required for the agent loop (install with "
+            f"`/usr/bin/python3 -m pip install -r plugins/auto-review/requirements.txt`): {error}"
+        ) from error
+    try:
+        client_cls = getattr(module, "ZaiClient")
+    except AttributeError as error:
+        raise ImportError(
+            "zai package is installed but does not export ZaiClient — "
+            "the bare `zai` distribution on PyPI is an unrelated 2018 placeholder; "
+            "install the official SDK with `/usr/bin/python3 -m pip install zai-sdk`."
+        ) from error
+    return client_cls
+
+
+def _build_client(api_key: str, base_url: str):
+    """Construct a configured ``ZaiClient``.
+
+    Passes the configured base URL through the SDK. The client performs
+    bearer-token authentication against ``$base_url/chat/completions`` and
+    returns strongly-typed ``Completion`` objects. Network errors surface
+    as ``zai.core.ZaiError`` / ``httpx.HTTPError`` subclasses; the agent
+    loop catches both and declines.
+    """
+    client_cls = _import_zai_client()
+    return client_cls(api_key=api_key, base_url=base_url, max_retries=0)
+
+
+def _completion_to_payload(completion: Any) -> dict:
+    """Convert a Z.ai ``Completion`` response into the plain dict shape that
+    ``_extract_assistant_message`` and ``_parse_first_tool_arguments``
+    consume.
+
+    The SDK exposes the response as Pydantic models with extra='allow' (so
+    any unknown field — including a future ``reasoning_details`` — round
+    trips through ``to_dict``). We additionally call ``to_dict(exclude_none=True)``
+    so unset fields do not show up as None in the message history, matching
+    the dict shape the model would otherwise see.
+    """
+    to_dict = getattr(completion, "to_dict", None)
+    if callable(to_dict):
+        try:
+            return dict(to_dict(exclude_unset=True))
+        except TypeError:
+            return dict(to_dict())
+    # Fallback: pydantic v2 BaseModel.
+    if hasattr(completion, "model_dump"):
+        return completion.model_dump(exclude_none=True)
+    if isinstance(completion, dict):
+        return completion
+    raise TypeError(f"cannot convert completion of type {type(completion).__name__} to dict")
+
 
 def run_agent_loop(tool_call: dict, env_snapshot: dict) -> dict:
     base_url = os.environ.get("AUTO_REVIEW_BASE_URL")
@@ -317,22 +383,43 @@ def run_agent_loop(tool_call: dict, env_snapshot: dict) -> dict:
     model = os.environ.get("AUTO_REVIEW_MODEL")
     if not all((base_url, api_key, model)):
         return {"verdict": "decline", "reason": "missing env vars", "turns": 0}
-    messages = [{"role": "user", "content": json.dumps({"tool_call": tool_call, "environment": env_snapshot})}]
+
+    try:
+        client = _build_client(api_key=api_key, base_url=base_url.rstrip("/"))
+    except (ImportError, Exception) as error:  # ZaiError, OSError, etc.
+        return {"verdict": "decline", "reason": str(error), "turns": 0}
+
+    messages: List[Any] = [{"role": "user",
+                            "content": json.dumps({"tool_call": tool_call,
+                                                   "environment": env_snapshot})}]
     loop_start = time.monotonic()
     for turn in range(1, MAX_TURNS + 1):
         if time.monotonic() - loop_start >= WALL_CLOCK_BUDGET_SECONDS:
             return {"verdict": "decline", "reason": "wall-clock timeout", "turns": turn - 1}
-        request = urllib.request.Request(f"{base_url.rstrip('/')}/chat/completions",
-            data=json.dumps({"model": model, "messages": messages,
-                             "tools": [REVIEW_TOOL], "tool_choice": "required",
-                             "max_tokens": 512, "temperature": 0.1}).encode(),
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=LLM_REQUEST_TIMEOUT_SECONDS) as response:
-                payload = json.loads(response.read().decode())
+            completion = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                tools=[REVIEW_TOOL],
+                tool_choice="required",
+                max_tokens=512,
+                temperature=0.1,
+                timeout=LLM_REQUEST_TIMEOUT_SECONDS,
+            )
+            payload = _completion_to_payload(completion)
             assistant_message = _extract_assistant_message(payload)
             arguments = _parse_first_tool_arguments(assistant_message)
-        except (OSError, urllib.error.URLError, json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as error:
+        except (ImportError, OSError, TimeoutError, ValueError, TypeError,
+                KeyError, IndexError, json.JSONDecodeError) as error:
+            # Catch the Z.ai SDK errors that wrap network/auth/timeout
+            # problems (``ZaiError`` and ``httpx.HTTPError`` subclasses are
+            # covered by ``OSError``/``TimeoutError``/explicit Exception in
+            # the broader safety net below). JSON-shaped protocol errors
+            # surface as the standard library exceptions.
+            return {"verdict": "decline", "reason": str(error), "turns": turn}
+        except Exception as error:
+            # Last-resort safety net: any other SDK/transport error is a
+            # decline, never a crash — the hook must never poison Codex.
             return {"verdict": "decline", "reason": str(error), "turns": turn}
         # Preserve the complete assistant message — content, tool_calls, and any
         # reasoning_details — so the model sees its prior tool calls in history.
@@ -359,7 +446,6 @@ def run_agent_loop(tool_call: dict, env_snapshot: dict) -> dict:
     return {"verdict": "decline", "reason": "max turns exhausted", "turns": MAX_TURNS}
 
 
-# ── Decision logging ───────────────────────────────────────────────────────────
 
 
 def log_decision(

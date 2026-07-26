@@ -1,0 +1,11 @@
+# Runtime dependency for plugins/auto-review.
+#
+# The hook uses the official Z.ai Python SDK so the agent loop can talk to
+# chat completions with native function tools via ZaiClient. The PyPI project
+# name is `zai-sdk`; it installs as the `zai` package and exports
+# ``from zai import ZaiClient`` (the bare `zai` distribution on PyPI is an
+# unrelated 2018 placeholder and is NOT the SDK).
+#
+# Install alongside Codex's runtime:
+#     /usr/bin/python3 -m pip install -r plugins/auto-review/requirements.txt
+zai-sdk>=0.2.3

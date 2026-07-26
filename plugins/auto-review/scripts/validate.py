@@ -13,8 +13,11 @@ validator doesn't cover:
   4. scripts/auto_review.py exists and is executable
   5. All three required env vars (AUTO_REVIEW_BASE_URL, AUTO_REVIEW_API_KEY,
      AUTO_REVIEW_MODEL) are referenced in scripts/auto_review.py and README.md
-  6. At least one test file exists in scripts/ (test_*.py)
-  7. README.md exists at the plugin root
+  6. The plugin-local requirements.txt exists and declares every runtime
+     package the hook imports (the Z.ai SDK today; this prevents silent
+     dependency drift if the import surface changes again).
+  7. At least one test file exists in scripts/ (test_*.py)
+  8. README.md exists at the plugin root
 
 Exits 0 on success, 1 on failure, and prints a per-check PASS/FAIL line plus a
 summary. The summary line is parseable for CI use.
@@ -43,6 +46,16 @@ REQUIRED_ENV_VARS: Tuple[str, ...] = (
 
 # Hook JSON must reference this exact script name in its `command` field.
 HOOK_SCRIPT_NAME = "auto_review.py"
+
+# Plugin-local runtime dependency manifest. The hook now imports the Z.ai
+# Python SDK (``from zai import ZaiClient``); this file must exist and name
+# the SDK so a fresh checkout fails loudly if the dependency drifts.
+REQUIREMENTS_FILE_NAME = "requirements.txt"
+# Pip accepts a handful of requirement specifiers — bare name, ``name==x``,
+# ``name>=x``, ``name[extra]>=x``, etc. We extract the leading package name
+# (lowercased) and require ``zai-sdk`` to be present. The bare ``zai``
+# distribution on PyPI is a 2018 placeholder, NOT the SDK.
+REQUIRED_PACKAGES: Tuple[str, ...] = ("zai-sdk",)
 
 
 def default_plugin_root() -> Path:
@@ -137,6 +150,61 @@ def check_env_var_documentation(plugin_root: Path) -> Tuple[bool, str]:
     return True, f"all {len(REQUIRED_ENV_VARS)} required env vars documented"
 
 
+def _parse_requirement_name(spec: str) -> str | None:
+    """Extract the leading package name from a pip requirement specifier.
+
+    Returns ``None`` for blank lines and ``-r``/``-e``/comment lines. For
+    a name like ``zai-sdk>=0.2.3`` returns ``"zai-sdk"``. URL/path-style
+    requirements and environment markers are ignored.
+    """
+    stripped = spec.strip()
+    if not stripped or stripped.startswith("#") or stripped.startswith("-"):
+        return None
+    # Drop inline comments first.
+    if " #" in stripped:
+        stripped = stripped.split(" #", 1)[0]
+    # The package name is the leading run of allowed characters.
+    name = ""
+    for char in stripped:
+        if char.isalnum() or char in "-_.":
+            name += char
+        else:
+            break
+    return name.lower() or None
+
+
+def check_requirements(plugin_root: Path) -> Tuple[bool, str]:
+    """The plugin-local requirements file must exist and name every
+    required runtime package. This prevents silent dependency drift when
+    someone edits the import surface without updating the manifest.
+    """
+    req_path = plugin_root / REQUIREMENTS_FILE_NAME
+    if not req_path.is_file():
+        return False, (
+            f"missing {REQUIREMENTS_FILE_NAME} (the hook depends on third-party "
+            f"packages — see plugins/auto-review/{REQUIREMENTS_FILE_NAME})"
+        )
+    try:
+        text = req_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return False, f"could not read {REQUIREMENTS_FILE_NAME}: {exc}"
+    declared = set()
+    for line in text.splitlines():
+        name = _parse_requirement_name(line)
+        if name:
+            declared.add(name)
+    missing = [pkg for pkg in REQUIRED_PACKAGES if pkg not in declared]
+    if missing:
+        return False, (
+            f"{REQUIREMENTS_FILE_NAME} missing required package(s): "
+            f"{', '.join(missing)}"
+        )
+    return True, (
+        f"{REQUIREMENTS_FILE_NAME} ok "
+        f"(declared: {', '.join(sorted(declared)) or '<empty>'})"
+    )
+
+
 def check_tests(plugin_root: Path) -> Tuple[bool, str]:
     scripts_dir = plugin_root / "scripts"
     if not scripts_dir.is_dir():
@@ -167,6 +235,7 @@ CHECKS: List[Tuple[str, Callable[[Path], Tuple[bool, str]]]] = [
     ("hooks",            check_hooks),
     ("hook_script",      check_hook_script),
     ("env_var_docs",     check_env_var_documentation),
+    ("requirements",     check_requirements),
     ("tests",            check_tests),
     ("readme",           check_readme),
 ]
